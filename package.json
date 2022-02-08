@@ -1,0 +1,11 @@
+{
+  "name": "notifi-moralis-cloud",
+  "version": "1.0.0",
+  "description": "Cloud functions for Notifi on Moralis",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
