@@ -106,3 +106,10 @@ async function getImportExportSecret() {
   const config = await Moralis.Config.get({ useMasterKey: true });
   return config.get("import_export_secret");
 }
+
+function processTemplate(template, data) {
+  return template.replace(
+    /\{\{\s*([^}\s]+)\s*\}\}/g,
+    (_, token) => data[token]
+  );
+}

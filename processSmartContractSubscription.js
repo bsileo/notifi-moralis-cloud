@@ -99,13 +99,6 @@ async function processSmartContractHit(subscription, transaction, activityName, 
   }
 }
 
-function processTemplate(template, data) {
-  return template.replace(
-    /\{\{\s*([^}\s]+)\s*\}\}/g,
-    (_, token) => data[token]
-  );
-}
-
 function getABIParameters(contractActivity, data, tx) {
   const logger = Moralis.Cloud.getLogger();
   const abi = contractActivity.get("ABI");

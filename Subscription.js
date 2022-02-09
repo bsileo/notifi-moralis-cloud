@@ -23,20 +23,22 @@ Moralis.Cloud.beforeSave(
 );
 
 async function checkUserStakingLevels(request) {
-  const logger = Moralis.Cloud.getLogger();
-  const subCount = await getUserSubscriptionCount(request.user);
-  const subLimit = await getUserSubscriptionLimit(request.user);
-  logger.info(
-    `[checkUserStakingLevels] ${request.user.id} - ${subCount} ?> ${subLimit}`
-  );
-  if (subCount >= subLimit) {
-    throw "Your staking level is to low to add more Subscriptions.";
+  if (request.user) {
+    const subCount = await getUserSubscriptionCount(request.user);
+    const subLimit = await getUserSubscriptionLimit(request.user);
+    logger.info(
+      `[checkUserStakingLevels] ${request.user.id} - ${subCount} ?> ${subLimit}`
+    );
+    if (subCount >= subLimit) {
+      throw "Your staking level is to low to add more Subscriptions.";
+    }
   }
 }
 
 Moralis.Cloud.afterSave("Subscription", async (request) => {
   const logger = Moralis.Cloud.getLogger();
   const { object: sub, context } = request;
+  updateUserChannelSubscriptions(sub, false);
   if (context && context.insert) {
     updateSubscriptionInsert(sub);
     const type = sub.get("subscriptionType");
@@ -53,6 +55,7 @@ Moralis.Cloud.afterDelete("Subscription", async (request) => {
   const { object: sub, context } = request;
   logger.info(`[subscription.afterDelete()] `);
   updateSubscriptionDelete(sub);
+  updateUserChannelSubscriptions(sub, true);
   const type = sub.get("subscriptionType");
   if (type == "Smart Contracts") {
     processSmartContractSubscriptionDelete(sub);
@@ -60,6 +63,22 @@ Moralis.Cloud.afterDelete("Subscription", async (request) => {
     processSmartWalletSubscriptionDelete(sub);
   }
 });
+
+// Add me as a subscription on all of my current UserChannels for 2 way M:N relation support
+async function updateUserChannelSubscriptions(sub, remove) {
+  const rel = sub.relation("UserChannel")
+  const q = rel.query();
+  const chans = await q.find({useMasterKey: true})
+  for (let i=0; i < chans.length; i++) {
+    const ucrel = chans[i].relation("subscriptions");
+    if (remove == true) {
+      ucrel.remove(sub);
+    } else {
+      ucrel.add(sub);
+    }
+    ucrel.save(null, {useMasterKey: true})
+  }
+}
 
 async function updateSubscriptionInsert(sub) {
   const logger = Moralis.Cloud.getLogger();
