@@ -22,6 +22,7 @@ Moralis.Cloud.define(
       const chatID = tu.get("chatID");
       return { success: true, userid: uid, chatID: chatID };
     }
+    logger.error("Error polling Telegram");
     return result;
   },
   {
@@ -39,7 +40,7 @@ Moralis.Cloud.define(
 async function telegramPoll() {
   const TELEGRAM_KEY = await getAPIKey("TELEGRAM_BOT");
   const offset = await getTelegramOffset();
-  logger.info(`GetUpdates from ${offset}`);
+  //logger.info(`GetUpdates from ${offset}`);
   const resp = await Moralis.Cloud.httpRequest({
     method: "GET",
     url: `https://api.telegram.org/${TELEGRAM_KEY}/getUpdates`,
@@ -48,10 +49,10 @@ async function telegramPoll() {
     },
   });
   if (resp.status == 200) {
-    logger.info(resp.text);
+    //logger.info(resp.text);
     const response = JSON.parse(resp.text);
-    const result = await processTelegramUpdates(response.result);
-    return { result: result, status: resp.status, body: resp.text };
+    const resultData = await processTelegramUpdates(response.result);
+    return { result: resultData, status: resp.status, body: resp.text };
   } else {
     logger.error("Telegram error " + resp.status);
     return { result: "error", status: resp.status, body: resp.text };
@@ -65,11 +66,12 @@ async function processTelegramUpdates(updates) {
     const uname = updates[i].message.from.username;
     const text = updates[i].message.text;
     updateID = updates[i].update_id;
-    logger.info(`${uname} sent: ${text} on ${updateID}`);
+    //logger.info(`${uname} sent: ${text} on ${updateID}`);
     const info = text.match(/Notifi-([A-z1-9]{8})/);
+    //logger.info("Match - " + info?.length);
     if (info && info.length == 2) {
       const tag = info[1];
-      processTelegramConnect(tag, updates[i]);
+      await processTelegramConnect(text, updates[i]);
     }
   }
   if (updateID) setTelegramOffset(updateID);
@@ -85,7 +87,7 @@ async function getTelegramOffset() {
 }
 
 async function setTelegramOffset(offset) {
-  logger.info(`Set new Offet: ${offset}`);
+  //logger.info(`Set new Offet: ${offset}`);
   const q = new Moralis.Query("TelegramUser");
   q.equalTo("userTag", "TelegramBot");
   let tu = await q.first({ useMasterkey: true });
@@ -101,12 +103,12 @@ async function setTelegramOffset(offset) {
 async function processTelegramConnect(tag, update) {
   const q = new Moralis.Query("TelegramUser");
   q.equalTo("userTag", tag);
-  const tu = await q.first({ useMasterkey: true });
-  logger.info(`Setting ${tu.id} for ${tag}`);
+  const tu = await q.first({ useMasterKey: true });
+  logger.info(`Update ${tag} for TelegramUser ${tu?.id}`);
   if (tu) {
-    tu.set("chatID", update.message.chat.id);
+    tu.set("chatID", parseInt(update.message.chat.id));
     tu.set("telegramUsername", update.message.from.username);
-    tu.save(null, { useMasterKey: true });
+    await tu.save(null, { useMasterKey: true });
   } else {
     logger.error(`Failed to locate Telegram Tag ${tag}`);
   }
