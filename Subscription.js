@@ -30,7 +30,8 @@ async function checkUserStakingLevels(request) {
       `[checkUserStakingLevels] ${request.user.id} - ${subCount} ?> ${subLimit}`
     );
     if (subCount >= subLimit) {
-      throw "Your staking level is to low to add more Subscriptions.";
+      const level = await getUserLevel(user)
+      throw `Your staking level is to low to add more Subscriptions - Users at level '${level}' are lmited to ${subLimit}`;
     }
   }
 }
