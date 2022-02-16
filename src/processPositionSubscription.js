@@ -13,12 +13,17 @@ async function processPositionSubscriptions(request) {
     subQuery.equalTo("status", "active");
     subQuery.ascending("contractChain");
     const subs = await subQuery.find({ useMasterKey: true });
+    logger.info("[processPositionSubscriptions] Got Subs");
     message(`Processing ${subs.length} Position Subscriptions - Gather Records`)
     const records = {};
     for (let i = 0; i < subs.length; i++) {
+      try {
         const chain = subs[i].get("contractChain");
         const prot = subs[i].get("Protocol")
-        if (!prot) { logger.error("[processPositionSubscriptions] Missing Protocol for " + subs[i].id); continue; }
+        if (prot == undefined) {
+          logger.error("[processPositionSubscriptions] Missing Protocol for " + subs[i].id); 
+          continue;
+        }
         await prot.fetch({useMasterKey: true});
         const project = prot.get("cookieName");
         const user =  subs[i].get("User")
@@ -26,14 +31,24 @@ async function processPositionSubscriptions(request) {
         const acct = user.get("accounts")[0];
         if (chain && project && acct) {
             if (!records[chain]) records[chain] = {};
+            logger.info("[processPositionSubscriptions] D1");
             if (!records[chain][project]) records[chain][project] = {};
+            logger.info("[processPositionSubscriptions] D2");
             if (!records[chain][project][acct]) records[chain][project][acct] = {};
+            logger.info("[processPositionSubscriptions] D3");
             if (!records[chain][project][acct].subscriptions) records[chain][project][acct].subscriptions = [];
+            logger.info("[processPositionSubscriptions] D4");
             records[chain][project][acct].subscriptions.push(subs[i]);
+            logger.info("[processPositionSubscriptions] D5");
         } else {
             logger.error("[processPositionSubscriptions]Missing Chain/Project/Acct for " + subs[i].id);
         }
+      }
+      catch (err) {
+        logger.error(`[processPositionSubscriptions] Failed processing Subscription ID ${subs[i].id} - ${err.message}`);
+      }
     }
+    message(`Gathering Project Positions`)
     for (const chain in records) {
         const projects = records[chain];
         for (const project in projects) {
@@ -44,7 +59,7 @@ async function processPositionSubscriptions(request) {
             }
         }
     };
-
+    message(`Processing Subscriptions`)
     for (const chain in records) {
         const projects = records[chain];
         for (const project in projects) {
@@ -66,6 +81,7 @@ async function processPositionSubscriptions(request) {
             }
         }
     }
+    message(`Completed`)
   }
 
   // eslint-disable-next-line prettier/prettier
@@ -135,7 +151,7 @@ async function processPositionSubscriptions(request) {
         //logger.info("JDATA=" + data);
         records = rawData.data;
     } else {
-        logger.error("Failed to read =" + url)
+        logger.error("[getProjectPositions] Failed to read =" + url)
         throw "Failed to read " + url;
     }
     return records;
