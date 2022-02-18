@@ -31,15 +31,10 @@ async function processPositionSubscriptions(request) {
         const acct = user.get("accounts")[0];
         if (chain && project && acct) {
             if (!records[chain]) records[chain] = {};
-            logger.info("[processPositionSubscriptions] D1");
             if (!records[chain][project]) records[chain][project] = {};
-            logger.info("[processPositionSubscriptions] D2");
             if (!records[chain][project][acct]) records[chain][project][acct] = {};
-            logger.info("[processPositionSubscriptions] D3");
             if (!records[chain][project][acct].subscriptions) records[chain][project][acct].subscriptions = [];
-            logger.info("[processPositionSubscriptions] D4");
             records[chain][project][acct].subscriptions.push(subs[i]);
-            logger.info("[processPositionSubscriptions] D5");
         } else {
             logger.error("[processPositionSubscriptions]Missing Chain/Project/Acct for " + subs[i].id);
         }
@@ -72,7 +67,7 @@ async function processPositionSubscriptions(request) {
                       );
                     messageData = {
                         address: sub.get("contractAddress"),
-                        protocolname: sub.get("Protocol")?.get("name"),
+                        protocolName: sub.get("Protocol")?.get("name"),
                         subscriptionName: sub.get("name"),
                       };
 
@@ -101,8 +96,8 @@ async function processPositionSubscriptions(request) {
     if (hit) {
       const msg = `Position Change Alert - ${messageData.reason}`
       const content = { plain: msg, rich: msg };
-      const template = undefined;
-      const richTemplate = undefined;
+      const template = getPlainTemplate(subscription);
+      const richTemplate = getRichTemplate(subscription);
       if (template) {
         const pTemplate = processTemplate(template, messageData);
         content.plain = `${pTemplate}`;
@@ -117,6 +112,20 @@ async function processPositionSubscriptions(request) {
     } else {
       logger.info(`[processPositionHit] No Hit`);
     }
+  }
+
+  function getPlainTemplate(subscription) {
+    const t = subscription.get("plainTemplate")
+    if (t) return t;
+    let msg = "Your position in {{ protocolName }} called {{ subscriptionName }} has changed.";
+    msg = msg + "Current Position Value ${{ positionValue }} {{ reason }} limit of ${{ reasonValue }}";
+    return msg;
+  }
+
+  function getRichTemplate(subscription) {
+    const t = subscription.get("richTemplate")
+    if (t) return t;
+    return undefined;
   }
 
   async function getPosition(subscription, records, message) {
@@ -157,7 +166,7 @@ async function processPositionSubscriptions(request) {
     return records;
   }
 
-  async function checkPosition(subscription, pos, data, message) {
+  async function checkPosition(subscription, pos, messageData, message) {
       logger.info("[checkPosition] Start");
       const subPosLow = subscription.get("positionLow")
       const subPosHigh = subscription.get("positionHigh")
@@ -174,15 +183,17 @@ async function processPositionSubscriptions(request) {
         }
         logger.info(`[checkPosition] ${subPosLow} < ${posValue} > ${subPosHigh}`);
         if (posValue > subPosHigh) {
-            data.reason = "Exceed High"
+            messageData.reason = "Exceeded High";
+            messageData.reasonValue = subPosHigh;
             hit = true;
         } else if (posValue < subPosLow) {
-            data.reason = "Under Low"
+            messageData.reason = "Under Low";
+            messageData.reasonValue = subPosLow;
             hit = true;
         }
-        data.positionValue = posValue
-        data.subPosHigh = subPosHigh
-        data.subPosLow = subPosLow
+        messageData.positionValue = posValue
+        messageData.subPosHigh = subPosHigh
+        messageData.subPosLow = subPosLow
       }
       logger.info("[checkPosition] Finish - " + hit);
       return hit;
