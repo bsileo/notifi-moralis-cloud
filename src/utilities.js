@@ -33,6 +33,12 @@ async function getLogger() {
   };
 }
 
+function roundToTwo(num ) {
+  const val = num * 100;
+  const res = Math.round(val);
+  return res / 100;
+}
+
 // import data from other server
 Moralis.Cloud.job("importData", async (request) => {
   const userSecret = request.params.input.secret;

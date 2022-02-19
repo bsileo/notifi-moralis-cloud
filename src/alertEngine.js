@@ -30,6 +30,8 @@ async function sendAlert(subscription, content) {
 
 async function saveAlertHistory(subscription, uChannel, content, result) {
   const aHist = Moralis.Object.extend("AlertHistory");
+  subscription.set("lastSent", new Date());
+  subscription.save(null, { useMasterKey: true });
   const ah = new aHist();
   ah.set("UserChannel", uChannel);
   const u = uChannel.get("User");
@@ -37,6 +39,13 @@ async function saveAlertHistory(subscription, uChannel, content, result) {
   ah.set("Subscription", subscription);
   ah.set("content", content);
   ah.set("result", result);
+  ah.set("status", "Sent");
+  ah.set("Protocol", subscription.get("Protocol"));
+  ah.set("SubscriptionType", subscription.get("subscriptionType"))
+  const category = subscription.get("GeneralSubType");
+  if (category) {
+    ah.set("category", cat.get("name"));
+  }
   await ah.save(null, { useMasterKey: true });
   return true;
 }

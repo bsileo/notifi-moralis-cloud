@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
 /* eslint-disable no-undef */
 Moralis.Cloud.job("processPositions", async (request) => {
     const { params, headers, log, message } = request;
@@ -182,18 +183,18 @@ async function processPositionSubscriptions(request) {
             posValue = pos.token0.balance * pos.token0.price + pos.token1.balance + pos.token1.price
         }
         logger.info(`[checkPosition] ${subPosLow} < ${posValue} > ${subPosHigh}`);
-        if (posValue > subPosHigh) {
+        if (subPosHigh != undefined && posValue > subPosHigh) {
             messageData.reason = "Exceeded High";
             messageData.reasonValue = subPosHigh;
             hit = true;
-        } else if (posValue < subPosLow) {
+        } else if (subPosLow != undefined && posValue < subPosLow) {
             messageData.reason = "Under Low";
             messageData.reasonValue = subPosLow;
             hit = true;
         }
-        messageData.positionValue = posValue
-        messageData.subPosHigh = subPosHigh
-        messageData.subPosLow = subPosLow
+        messageData.positionValue = roundToTwo(posValue);
+        messageData.subPosHigh = subPosHigh;
+        messageData.subPosLow = subPosLow;
       }
       logger.info("[checkPosition] Finish - " + hit);
       return hit;
