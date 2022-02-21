@@ -14,7 +14,7 @@ async function processPositionSubscriptions(request) {
     subQuery.equalTo("status", "active");
     subQuery.ascending("contractChain");
     const subs = await subQuery.find({ useMasterKey: true });
-    logger.info("[processPositionSubscriptions] Got Subs");
+    //logger.info("[processPositionSubscriptions] Got Subs");
     message(`Processing ${subs.length} Position Subscriptions - Gather Records`)
     const records = {};
     for (let i = 0; i < subs.length; i++) {
@@ -45,6 +45,7 @@ async function processPositionSubscriptions(request) {
       }
     }
     message(`Gathering Project Positions`)
+    logger.info("[processPositionSubscriptions] Gathering Project Positions");
     for (const chain in records) {
         const projects = records[chain];
         for (const project in projects) {
@@ -56,6 +57,7 @@ async function processPositionSubscriptions(request) {
         }
     };
     message(`Processing Subscriptions`)
+    logger.info("[processPositionSubscriptions] Processing Subscriptions");
     for (const chain in records) {
         const projects = records[chain];
         for (const project in projects) {
@@ -63,9 +65,9 @@ async function processPositionSubscriptions(request) {
             for (account in accounts) {
                 const curSubs = records[chain][project][account].subscriptions;
                 curSubs.forEach( (sub) => {
-                    logger.info(
-                        `[processPositionSubscriptions] Start Position sub ${sub.id} #################################`
-                      );
+                    //logger.info(
+                    //    `[processPositionSubscriptions] Start Position sub ${sub.id} #################################`
+                    //  );
                     messageData = {
                         address: sub.get("contractAddress"),
                         protocolName: sub.get("Protocol")?.get("name"),
@@ -82,14 +84,12 @@ async function processPositionSubscriptions(request) {
 
   // eslint-disable-next-line prettier/prettier
   async function processPositionHit(subscription, positionRecords, messageData, message ) {
-    logger.info(
-      `[processPositionHit] Start ${subscription.id}"`
-    );
+    //logger.info(`[processPositionHit] Start ${subscription.id}"`);
     let hit = false;
     const msg = ""
     const pos = await getPosition(subscription, positionRecords, message);
     if (pos) {
-        logger.info(`[processPositionHit] Got POS Back - ${pos}`);
+        //logger.info(`[processPositionHit] Got POS Back - ${pos}`);
         hit = await checkPosition(subscription, pos, messageData, message);
     } else {
         logger.error(`[processPositionHit] No Position found for ${subscription.id}`);
@@ -111,7 +111,7 @@ async function processPositionSubscriptions(request) {
       //logger.info(`[processPositionHit] Sending`);
       sendAlert(subscription, content, messageData);
     } else {
-      logger.info(`[processPositionHit] No Hit`);
+      //logger.info(`[processPositionHit] No Hit`);
     }
   }
 
@@ -132,23 +132,23 @@ async function processPositionSubscriptions(request) {
   async function getPosition(subscription, records, message) {
     const contract = subscription.get("contractAddress");
     const status = subscription.get("positionStatus");
-    logger.info("[getPosition] Processing Records "+ records.length)
+    //logger.info("[getPosition] Processing Records "+ records.length)
     //logger.info(`[getPosition] SUB--${contract} -- ${status}`)
     let pos = null;
     for (let i=0; i< records.length; i++) {
         const rec = records[i];
         if (rec.address == contract && rec.status == status ) pos = rec;
     }
-    logger.info(`[getPosition] Match? ${pos}`);
+    //logger.info(`[getPosition] Match? ${pos}`);
     return pos;
   }
 
   async function getProjectPositions(chain, project, account, message) {
-    logger.info(`[getProjectPositions] Setup Started`)
+    //logger.info(`[getProjectPositions] Setup Started`)
     const config = await Moralis.Config.get({useMasterKey: true});
     const cookieAPI = config.get("cookieAPIURL")
     const url = `${cookieAPI}/${chain}/${project}?address=${account}`;
-    logger.info(`[getProjectPositions] Setup done ${url}`)
+    logger.info(`[getProjectPositions] Requesting ${url}`)
     message(`Requesting ${url}`);
     const resp = await Moralis.Cloud.httpRequest({url: url })
     let records = null;

@@ -2,10 +2,14 @@
 //   plain: "Plain Content",
 //   rich: "Rich text<br/>Content"
 //   }
-/* eslint-disable no-undef */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function sendAlert(subscription, content) {
+async function sendAlert(subscription, content, messageData) {
   const logger = Moralis.Cloud.getLogger();
+  const frequencyAllowed = checkAlertFrequency(subscription, content);
+  if (!frequencyAllowed) {
+    logger.info(`[SendAlert] Skipped ${subscription.id} due to frequency limit`);
+    return;
+  }
   const relChannels = subscription.relation("UserChannel");
   const qc = relChannels.query();
   qc.equalTo("status", "Active");
@@ -26,6 +30,22 @@ async function sendAlert(subscription, content) {
     }
     saveAlertHistory(subscription, chan, content, res);
   }
+}
+
+function checkAlertFrequency(subscription, content) {
+  const uf = subscription.get("userFrequency");
+  if (uf == undefined || uf == "always") {
+    // no frequency, so Ok to proceed
+    return true;
+  }
+  const last = subscription.get("lastSent");
+  const now = new Date();
+  const deltaRaw = now - last;
+  const deltaMins = deltaRaw / ( 1000 * 60)
+  let allowed = 60 // hour
+  if (uf == "day") allowed = 60*24;
+  logger.info(`[checkAlertFrequency]  ${uf} ${allowed} ${deltaMins} ${allowed < deltaMins} ${subscription.id}`);
+  return allowed < deltaMins
 }
 
 async function saveAlertHistory(subscription, uChannel, content, result) {

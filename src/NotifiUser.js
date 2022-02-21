@@ -51,7 +51,6 @@ async function getUserNotifiBalance(user) {
 }
 
 async function NotifiTokenAddress() {
-  const logger = Moralis.Cloud.getLogger();
   const config = await Moralis.Config.get({ useMasterKey: true });
   return config.get("NotifiAddress");
 }
