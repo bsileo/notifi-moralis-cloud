@@ -37,11 +37,11 @@ Moralis.Cloud.afterSave("UserChannel", async (request) => {
 });
 
 Moralis.Cloud.define(
-  "resendVerification",
+  "resendVerificationMessage",
   async (request) => {
     const ucID = request.params.userChannelID;
     const uChan = new Moralis.Query("UserChannel");
-    uc = await uChan.get(ucID);
+    uc = await uChan.get(ucID, {useMasterKey: true});
     return processVerification(uc);
   },
   {
@@ -87,7 +87,6 @@ function processEmailVerification(uc) {
   if (pd.setDefault) {
     // special case - use system email and verification
     const u = uc.get("User");
-    logger.info("processEV " + u);
     u.set("email", pd.email);
     u.save(null, { useMasterKey: true });
     uc.set("status", "Pending Verification");
@@ -96,9 +95,8 @@ function processEmailVerification(uc) {
   } else {
     const code = getRandomCode();
     const serverURL =
-      "https://dfnrl9oy6cjp.usemoralis.com:2053/server/functions";
-    const appID = "_ApplicationId=vNzZEcsSUFcPhfxYFqNbfMXVyfp2cNSX8tha5TwW";
-    const link = `${serverURL}/confirmEmail?code=${code}&${appID}`;
+      "https://www.cryptonotifi.xyz/email_confirm";
+    const link = `${serverURL}?code=${code}`;
     const content = {
       plain:
         "Welcome to Notifi. Click this link to Confirm your email address. If you did not request this message you can safely ignore it.",
@@ -114,21 +112,21 @@ function processEmailVerification(uc) {
 Moralis.Cloud.define("confirmEmail", async (request) => {
   const code = request.params.code;
   const q = new Moralis.Query("UserChannel");
+  if (!code) { throw "No Email verification Code provided" }
   q.equalTo("verificationCode", code);
   const uc = await q.first({ useMasterKey: true });
-  logger.info("[confirmEmail]" + uc);
   if (uc) {
     uc.set("status", "Active");
     uc.save(null, { useMasterKey: true });
-    return "Your email address was verified. Continue to <a href='www.cryptonotifi.xyz'>Notifi</a> to setup your Subscriptions!";
+    return true;
   } else {
-    return "Invalid verification code.";
+    return false;
   }
 });
 
 function getRandomCode() {
   var chars =
-    "0123456789abcdefghijklmnopqrstuvwxyz!@#$%^&*()ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   var passwordLength = 20;
   var password = "";
   for (var i = 0; i <= passwordLength; i++) {
