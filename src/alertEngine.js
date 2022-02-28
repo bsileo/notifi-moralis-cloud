@@ -34,7 +34,7 @@ async function sendAlert(subscription, content, messageData) {
 
 function checkAlertFrequency(subscription, content) {
   const uf = subscription.get("userFrequency");
-  if (uf == undefined || uf == "always") {
+  if (uf == undefined || uf == "always" || uf == "") {
     // no frequency, so Ok to proceed
     return true;
   }

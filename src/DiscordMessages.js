@@ -1,33 +1,63 @@
 /* eslint-disable no-undef */
 Moralis.Cloud.beforeSave("DiscordMessages", async (request) => {
+    const { object: dm, context } = request;
     const q = new Moralis.Query("DiscordMessages")
-    q.equalTo("discordID", request.object.get("discordID"));
-    const count = await q.count();
-    if (count > 0) {
-        throw "Rejected duplicate Discord Message"
+    const dupCheck = context && !context.addAlert;
+    if (dupCheck) {
+      q.equalTo("discordID", dm.get("discordID"));
+      const count = await q.count();
+      if (count > 0) {
+          throw "Rejected duplicate Discord Message"
+      }
     }
   });
 
 Moralis.Cloud.afterSave("DiscordMessages", async (request) => {
   const { object: dm, context } = request;
-  processDiscordMessage(dm);
+  const notAlert = context && !context.addAlert;
+  if (notAlert) {
+    processDiscordMessage(dm);
+  }
 });
+
+Moralis.Cloud.define("processDiscordMessage", async (request) => {
+  const query = new Moralis.Query("DiscordMessages");
+  const dm = await query.get(request.params.id, {useMasterKey: true});
+  if (dm) {
+    await processDiscordMessage(dm);
+  } else {
+    throw "Failed to locate that ID";
+  }
+  return true;
+})
+
+Moralis.Cloud.job("processDiscordMessage", async (request) => {
+  const { params, headers, log, message } = request;
+  const query = new Moralis.Query("DiscordMessages");
+  const dm = await query.get(params.id, {useMasterKey: true});
+  if (dm) {
+    message("Processing")
+    await processDiscordMessage(dm);
+    message("Completed");
+  } else {
+    throw "Failed to locate that ID";
+  }
+  return true;
+})
 
 async function processDiscordMessage(dm) {
   const category = await getDiscordCategory(dm);
   if (category) {
     const Alert = Moralis.Object.extend("Alert");
     const a = new Alert();
-    logger.info("a");
     a.set("protocol", category.get("protocol"));
-    logger.info("b");
     a.set("content", getDiscordContent(dm));
-    logger.info("c");
     a.set("richContent", getDiscordRichContent(dm));
-    logger.info("d");
     a.set("Type", category);
     a.set("source", "Discord");
-    a.save(null, {useMasterKey: true})
+    const newA = await a.save(null, {useMasterKey: true})
+    dm.set("Alert", newA);
+    await dm.save(null, { context: {addAlert: true}, useMasterKey: true})
   } else {
     logger.info(`No Category found for ${dm.id}`);
   }
@@ -49,5 +79,5 @@ function getDiscordContent(dm) {
 
 function getDiscordRichContent(dm) {
   const base = dm.get("content");
-  return `<h1>Update</h1> ${base}`;
+  return `${base}`;
 }
