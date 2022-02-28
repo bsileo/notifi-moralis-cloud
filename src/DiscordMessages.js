@@ -79,5 +79,6 @@ function getDiscordContent(dm) {
 
 function getDiscordRichContent(dm) {
   const base = dm.get("content");
-  return `${base}`;
+  const html = markdown(base);
+  return `${html}`;
 }
