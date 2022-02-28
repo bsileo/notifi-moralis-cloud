@@ -39,6 +39,10 @@ function checkAlertFrequency(subscription, content) {
     return true;
   }
   const last = subscription.get("lastSent");
+  if (last == undefined) {
+    // First time so OK to proceed
+    return true;
+  }
   const now = new Date();
   const deltaRaw = now - last;
   const deltaMins = deltaRaw / ( 1000 * 60)

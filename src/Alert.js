@@ -7,9 +7,9 @@ Moralis.Cloud.afterSave("Alert", async (request) => {
     plain: request.object.get("content"),
     rich: request.object.get("richContent"),
   };
-  const prot = request.object.get("Protocol");
+  const prot = request.object.get("protocol");
   if (prot) {
-    query.equalTo("protocolID", prot.id);
+    query.equalTo("Protocol", prot);
   }
   query.equalTo("subscriptionType", "Protocol Alerts");
   query.equalTo("GeneralSubType", request.object.get("Type"));
@@ -18,7 +18,7 @@ Moralis.Cloud.afterSave("Alert", async (request) => {
   logger.info(`[alert.afterSave()] Got ${res} with ${count}`);
   for (let i = 0; i < res.length; i++) {
     const sub = res[i];
-    logger.info(`[alert.afterSave()] Sending "${content}" to SubID=${sub.id}`);
+    logger.info(`[alert.afterSave()] Sending "${content.plain}" to SubID=${sub.id}`);
     sendAlert(sub, content);
   }
 });
