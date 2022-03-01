@@ -123,9 +123,9 @@ async function sendTelegramAlert(channel, content) {
     `Telegram send ${content.plain} to ${channel.get("providerData").chatID}`
   );
   const TELEGRAM_KEY = await getAPIKey("TELEGRAM_BOT");
-  logger.info(`[SendTelegramAlert] Content="${content.plain}"`);
+  //logger.info(`[SendTelegramAlert] Content="${content.plain}"`);
   const url = `https://api.telegram.org/${TELEGRAM_KEY}/sendMessage?chat_id=${chatID}&text=${content.plain}`;
-  logger.info(`[SendTelegramAlert] ${url}`);
+  //logger.info(`[SendTelegramAlert] ${url}`);
   try {
     const httpResp = await Moralis.Cloud.httpRequest({
       method: "GET",
