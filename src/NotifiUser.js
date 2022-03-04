@@ -54,3 +54,15 @@ async function NotifiTokenAddress() {
   const config = await Moralis.Config.get({ useMasterKey: true });
   return config.get("NotifiAddress");
 }
+
+async function validateUserRole(user, role) {
+  const roleQuery = new Moralis.Query(Moralis.Role)
+  roleQuery.equalTo('name', role)
+  roleQuery.equalTo('users', user)
+  return await roleQuery.first({ useMasterKey: true })
+}
+
+Moralis.Cloud.define('adminUser', async (request) => {
+  const res = await validateUserRole(request.user, 'admin');
+  return res != undefined;
+})

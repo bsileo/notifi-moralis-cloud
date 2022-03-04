@@ -19,6 +19,6 @@ Moralis.Cloud.afterSave("Alert", async (request) => {
   for (let i = 0; i < res.length; i++) {
     const sub = res[i];
     logger.info(`[alert.afterSave()] Sending "${content.plain}" to SubID=${sub.id}`);
-    sendAlert(sub, content);
+    sendAlert(sub, content, {});
   }
 });

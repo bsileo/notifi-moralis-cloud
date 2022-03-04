@@ -3,7 +3,7 @@
 //   rich: "Rich text<br/>Content"
 //   }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function sendAlert(subscription, content, messageData) {
+async function sendAlert(subscription, content, messageData = {}) {
   const logger = Moralis.Cloud.getLogger();
   const frequencyAllowed = checkAlertFrequency(subscription, content);
   if (!frequencyAllowed) {
@@ -24,7 +24,7 @@ async function sendAlert(subscription, content, messageData) {
     } else if (PID == "twilio") {
       res = await sendTwilioAlert(chan, content);
     } else if (PID == "email") {
-      res = await sendEmailAlert(chan, content);
+      res = await sendEmailAlert(chan, content, subscription, messageData);
     } else if (PID == "telegram") {
       res = await sendTelegramAlert(chan, content);
     }
