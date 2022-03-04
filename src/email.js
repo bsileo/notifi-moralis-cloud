@@ -30,8 +30,8 @@ async function sendEmailAlert(channel, content, subscription, messageData) {
     }
     protTemplateID = prot.get("SendgridTemplateID");
   }
-  
-  logger.info(`PROT-${protTemplateID} SUB-${categoryTemplateID}`)
+
+  //logger.info(`PROT-${protTemplateID} SUB-${categoryTemplateID}`)
   if (categoryTemplateID) {
     logger.info(`[SendEmailAlert] Use Category Template`);
     messageData.content = content.rich || content.plain
@@ -41,7 +41,6 @@ async function sendEmailAlert(channel, content, subscription, messageData) {
     logger.info(`[SendEmailAlert] Use Protocol Template`);
     if (content.rich) messageData.content = content.rich;
     else messageData.content = content.plain;
-    logger.info(`[SendEmailAlert] ${messageData.content}`);
     data.personalizations[0].dynamic_template_data = messageData;
     data.template_id = protTemplateID;
     data.subject = `${prot.get("Name")} Alert`;

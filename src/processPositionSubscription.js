@@ -118,8 +118,8 @@ async function processPositionSubscriptions(request) {
   function getPlainTemplate(subscription) {
     const t = subscription.get("plainTemplate")
     if (t) return t;
-    let msg = "Your position in {{ protocolName }} called {{ subscriptionName }} has changed.";
-    msg = msg + "Current Position Value ${{ positionValue }} {{ reason }} limit of ${{ reasonValue }}";
+    let msg = "Your position in {{ protocolName }} called {{ subscriptionName }} has changed.\n";
+    msg = msg + "The current position value of ${{ positionValue }} {{ reason }} limit of ${{ reasonValue }}.";
     return msg;
   }
 
