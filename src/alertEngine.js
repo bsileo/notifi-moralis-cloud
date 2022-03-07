@@ -4,11 +4,15 @@
 //   }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function sendAlert(subscription, content, messageData = {}) {
-  const logger = Moralis.Cloud.getLogger();
-  const frequencyAllowed = checkAlertFrequency(subscription, content);
+  logger.info(`[sendalert] Sending "${content.plain}" to SubID=${subscription.id}`);
+  try {
+  const frequencyAllowed = await checkAlertFrequency(subscription, content, messageData);
   if (!frequencyAllowed) {
-    logger.info(`[SendAlert] Skipped ${subscription.id} due to frequency limit`);
+    logger.info(`[SendAlert] Skipped/Queued ${subscription.id} due to frequency/group controls`);
     return;
+  }
+  } catch (err) {
+    logger.error("Check Freq - " + err)
   }
   const relChannels = subscription.relation("UserChannel");
   const qc = relChannels.query();
@@ -28,11 +32,37 @@ async function sendAlert(subscription, content, messageData = {}) {
     } else if (PID == "telegram") {
       res = await sendTelegramAlert(chan, content);
     }
-    saveAlertHistory(subscription, chan, content, res);
+    saveAlertHistory(subscription, content, res, chan);
   }
+  logger.info("Update Subscription lastSent");
+  subscription.set("lastSent", new Date());
+  subscription.save(null, { useMasterKey: true });
+  
 }
 
-function checkAlertFrequency(subscription, content) {
+async function checkAlertFrequency(subscription, content, messageData) {
+  const subFreq = checkAlertSubscriptionFrequency(subscription, content, messageData);
+  const groupFreq = await checkAlertGroupFrequency(subscription, content, messageData);
+  return subFreq && groupFreq;
+}
+async function checkAlertGroupFrequency(subscription, content, messageData) {
+  const group = subscription.get("Group");
+  if (!group) { console.log("[checkAlertGroupFreq] No group"); return true; }
+  await group.fetch({useMasterKey: true});
+  const freq = group.get("frequency");
+  if (freq == "Real-time") { console.log("[checkAlertGroupFreq] Real-time"); return true };
+  const AQ = Moralis.Object.extend("AlertQueue");
+  const aQueue = new AQ();
+  aQueue.set("Group", group);
+  aQueue.set("Subscription", subscription);
+  aQueue.set("content", content);
+  aQueue.set("messageData", messageData);
+  aQueue.save(null, {useMasterKey: true});
+  logger.info(`Queued alert for ${subscription.id} due to Group Membership`)
+  return false;
+}
+
+function checkAlertSubscriptionFrequency(subscription, content, messageData) {
   const uf = subscription.get("userFrequency");
   if (uf == undefined || uf == "always" || uf == "") {
     // no frequency, so Ok to proceed
@@ -52,26 +82,43 @@ function checkAlertFrequency(subscription, content) {
   return allowed < deltaMins
 }
 
-async function saveAlertHistory(subscription, uChannel, content, result) {
-  logger.info("Update Subscription lastSent");
-  subscription.set("lastSent", new Date());
-  subscription.save(null, { useMasterKey: true });
+async function saveAlertHistory(subscription, content, result, uChannel=null, group=null, alertID=null) {
   logger.info("Make AlertHistory");
   const aHist = Moralis.Object.extend("AlertHistory");
   const ah = new aHist();
-  ah.set("UserChannel", uChannel);
-  const u = uChannel.get("User");
-  ah.set("User", u);
-  ah.set("Subscription", subscription);
-  ah.set("content", content);
-  ah.set("result", result);
-  ah.set("status", "Sent");
-  ah.set("Protocol", subscription.get("Protocol"));
-  ah.set("SubscriptionType", subscription.get("subscriptionType"))
-  const cat = subscription.get("GeneralSubType");
-  if (cat) {
-    ah.set("Category", cat);
+  let u = null;
+  if (uChannel) {
+    ah.set("UserChannel", uChannel);
+    u = uChannel.get("User");
   }
-  await ah.save(null, { useMasterKey: true });
+  if (group) {
+    ah.set("group", group);
+    u = group.get("User");
+  }
+  try {
+    ah.set("User", u);
+    ah.set("Subscription", subscription);
+    ah.set("content", content);
+    ah.set("result", result);
+    ah.set("status", "Sent");
+    logger.info("[saveAlertHistory] 0")
+    ah.set("Protocol", subscription.get("Protocol"));
+    ah.set("SubscriptionType", subscription.get("subscriptionType"))
+    logger.info("[saveAlertHistory] A")
+    if (alertID) {
+      ah.set("AlertID", alertID);
+    }
+    logger.info("[saveAlertHistory] b")
+    const cat = subscription.get("GeneralSubType");
+    if (cat) {
+      ah.set("Category", cat);
+    }
+    logger.info("[saveAlertHistory] C")
+    await ah.save(null, { useMasterKey: true });
+    logger.info("[saveAlertHistory] D")
+  } catch (err) {
+    logger.error(err)
+    return false;
+  }
   return true;
 }

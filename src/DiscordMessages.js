@@ -55,6 +55,7 @@ async function processDiscordMessage(dm) {
     a.set("richContent", getDiscordRichContent(dm));
     a.set("Type", category);
     a.set("source", "Discord");
+    a.set("url", dm.get("discordUrl"));
     const newA = await a.save(null, {useMasterKey: true})
     dm.set("Alert", newA);
     await dm.save(null, { context: {addAlert: true}, useMasterKey: true})

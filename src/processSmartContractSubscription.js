@@ -16,11 +16,13 @@ async function processSmartContractSubscriptions(transaction, activityName) {
     logger.info(
       `[processSmartContractSubscriptions] Smart Contract sub hit ${subs[i].id}`
     );
-    let msg = `Smart Contract Subscription match on '${subs[i].get("name")}'`;
+    const subName = subs[i].get("name");
+    let msg = `Smart Contract Subscription match on '${subName}'`;
     data = {
       address: addr,
       subscriptionName: subs[i].get("name"),
       activityName: activityName,
+      title: `${subName} Contract Alert`,
     };
     logger.info(
       `[processSmartContractSubscriptions] Process hit on ${subs[i].id}`
@@ -41,21 +43,21 @@ async function processSmartContractHit(subscription, transaction, activityName, 
     // This is an Event Subscription
     const contract = subscription.get("contract");
     const subName = subActivity.get("name");
-    logger.info(`[processSmartContractHit] CA ${subActivity.id} - ${subName}`);
-    logger.info(`[processSmartContractHit] Contract ${contract.id}`);
+    // logger.info(`[processSmartContractHit] CA ${subActivity.id} - ${subName}`);
+    // logger.info(`[processSmartContractHit] Contract ${contract.id}`);
     hit = hit && subName.toLowerCase() == activityName.toLowerCase();
     msg = `${msg} for Event ${activityName}`;
     data.contractName = contract.get("name");
     data = getABIParameters(subActivity, data, transaction);
-    logger.info(`[processSmartContractHit] Event Sub Hit= ${hit}`);
+    // logger.info(`[processSmartContractHit] Event Sub Hit= ${hit}`);
   } else {
     // This is a Tranasaction subscription
     // So we can also have value checks
-    logger.info(`[processSmartContractHit] TX Sub Start`);
+    // logger.info(`[processSmartContractHit] TX Sub Start`);
     const txVal = parseInt(transaction.get("value"));
     const subVal = parseInt(subscription.get("value"));
     const op = subscription.get("valueOperator");
-    logger.info(`[processSmartContractHit] TX Sub ${txVal} ${op} ${subVal}`);
+    // logger.info(`[processSmartContractHit] TX Sub ${txVal} ${op} ${subVal}`);
     data.transactionValue = txVal;
     data.subscriptionValue = subVal;
     switch (op) {
@@ -75,15 +77,13 @@ async function processSmartContractHit(subscription, transaction, activityName, 
         data.operation = "equals";
         break;
     }
-    logger.info(`[processSmartContractHit] TX Sub Hit= ${hit}`);
+    // logger.info(`[processSmartContractHit] TX Sub Hit= ${hit}`);
   }
   if (hit) {
     const content = { plain: msg, rich: msg };
     const template = subActivity.get("template");
     const richTemplate = subActivity.get("richTemplate");
-    logger.info(
-      `[processsmartContractHit] Template="${template}" richTemplate="${richTemplate}`
-    );
+    // logger.info(`[processsmartContractHit] Template="${template}" richTemplate="${richTemplate}`);
     if (template) {
       const pTemplate = processTemplate(template, data);
       content.plain = `${pTemplate}`;
