@@ -184,11 +184,11 @@ async function processPositionSubscriptions(request) {
         }
         logger.info(`[checkPosition] ${subPosLow} < ${posValue} > ${subPosHigh}`);
         if (subPosHigh != undefined && posValue > subPosHigh) {
-            messageData.reason = "Exceeded High";
+            messageData.reason = "has exceeded the high";
             messageData.reasonValue = subPosHigh;
             hit = true;
         } else if (subPosLow != undefined && posValue < subPosLow) {
-            messageData.reason = "Under Low";
+            messageData.reason = "is under the low";
             messageData.reasonValue = subPosLow;
             hit = true;
         }

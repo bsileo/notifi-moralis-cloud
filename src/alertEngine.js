@@ -46,20 +46,40 @@ async function checkAlertFrequency(subscription, content, messageData) {
   return subFreq && groupFreq;
 }
 async function checkAlertGroupFrequency(subscription, content, messageData) {
-  const group = subscription.get("Group");
-  if (!group) { console.log("[checkAlertGroupFreq] No group"); return true; }
-  await group.fetch({useMasterKey: true});
-  const freq = group.get("frequency");
-  if (freq == "Real-time") { console.log("[checkAlertGroupFreq] Real-time"); return true };
-  const AQ = Moralis.Object.extend("AlertQueue");
-  const aQueue = new AQ();
-  aQueue.set("Group", group);
-  aQueue.set("Subscription", subscription);
-  aQueue.set("content", content);
-  aQueue.set("messageData", messageData);
-  aQueue.save(null, {useMasterKey: true});
-  logger.info(`Queued alert for ${subscription.id} due to Group Membership`)
+  try {
+    if (!subscription) { console.log("[checkAlertGroupFreq] No subscription"); return true; }
+    const group = subscription.get("Group");
+    if (!group) { console.log("[checkAlertGroupFreq] No group"); return true; }
+    await group.fetch({useMasterKey: true});
+    const freq = group.get("frequency");
+    if (freq == "Real-time") { console.log("[checkAlertGroupFreq] Real-time"); return true };
+    let aQueue = await getExistingAlertQueue(subscription);
+    if (!aQueue) {
+      const AQ = Moralis.Object.extend("AlertQueue");
+      aQueue = new AQ();
+    }
+    aQueue.set("Group", group);
+    aQueue.set("Subscription", subscription);
+    aQueue.set("content", content);
+    aQueue.set("messageData", messageData);
+    aQueue.save(null, {useMasterKey: true});
+    logger.info(`Alert queue for ${subscription.id} due to Group Membership`)
+  }
+  catch (err) {
+    logger.error("Failed in checkAlertGroupFrequency - " + err);
+  }
   return false;
+}
+
+async function getExistingAlertQueue(subscription) {
+  const subType = subscription.get("subscriptionType");
+  // No collapse for these
+  if (subType == "Protocol Alerts") return;
+  if (subType == "Smart Contracts") return;
+  
+  const query = new Moralis.Query("AlertQueue");
+  query.equalTo("Subscription", subscription)
+  return await query.first({useMasterKey: true});
 }
 
 function checkAlertSubscriptionFrequency(subscription, content, messageData) {
@@ -101,21 +121,16 @@ async function saveAlertHistory(subscription, content, result, uChannel=null, gr
     ah.set("content", content);
     ah.set("result", result);
     ah.set("status", "Sent");
-    logger.info("[saveAlertHistory] 0")
     ah.set("Protocol", subscription.get("Protocol"));
     ah.set("SubscriptionType", subscription.get("subscriptionType"))
-    logger.info("[saveAlertHistory] A")
     if (alertID) {
       ah.set("AlertID", alertID);
     }
-    logger.info("[saveAlertHistory] b")
     const cat = subscription.get("GeneralSubType");
     if (cat) {
       ah.set("Category", cat);
     }
-    logger.info("[saveAlertHistory] C")
     await ah.save(null, { useMasterKey: true });
-    logger.info("[saveAlertHistory] D")
   } catch (err) {
     logger.error(err)
     return false;
