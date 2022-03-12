@@ -52,10 +52,10 @@ function updateNextSend(group) {
     const alertTime = new Date(ds);
     const h = alertTime.getHours();
     const m = alertTime.getMinutes();
-    logger.info(`ds="${ds}" at=${alertTime} h=${h} - m=${m}`);
+    // logger.info(`ds="${ds}" at=${alertTime} h=${h} - m=${m}`);
     d.setHours(h);
     d.setMinutes(m, 0, 0);
-    logger.info(d)
+    // logger.info(d)
     if (group.get("frequency") == "Weekly") {
       const dayINeed = days[group.get("alertDay")];
       //logger.info (dayINeed)
