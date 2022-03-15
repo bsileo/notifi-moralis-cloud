@@ -1,12 +1,11 @@
 
 Moralis.Cloud.beforeSave("Group", async (request) => {
     const group = request.object;
-    //logger.info(`[group.beforeSave] ${group.id}`);
     try {
         updateNextSend(group);
     }
     catch (err) {
-        logger.error("beforeSave - " + err)
+        logger.error("[Group.beforeSave] - " + err)
     }
 });
 
@@ -20,7 +19,7 @@ Moralis.Cloud.afterDelete("Group", async (request) => {
         await aSub.save(null, {useMasterKey: true});
     })
     } catch (err) {
-        logger.error("Group.afterDelete - " + err)
+        logger.error("[Group.afterDelete] - " + err)
     }
   });
 
@@ -109,17 +108,50 @@ async function processGroups(request) {
     for (let i=0; i< groups.length; i++) {
         const group = groups[i];
         logger.info(`[processGroups] ${i} ${group.id}`);
-        const res = await sendGroup(group);
-        if (res && res.status) {
-            const success = await cleanupGroupAlertQueues(group, res);
-            if (success) {
-                group.set("lastSent",new Date());
-                group.save(null, {useMasterKey: true});
-            }
-        }
+        await processGroup(group)
     }
 }
 
+async function processGroup(group) {
+    const res = await sendGroup(group);
+    if (res && res.status) {
+        const success = await cleanupGroupAlertQueues(group, res);
+        if (success) {
+            group.set("lastSent",new Date());
+            group.save(null, {useMasterKey: true});
+        }
+    }
+    return res;
+}
+
+Moralis.Cloud.define("processGroup", async (request) => {
+    logger.info("[processGroup] Starting group Processing");
+    let result = false;
+    let error = "";
+    let info = "";
+    try {
+      const groupID = request.params.groupID;
+      const query = new Moralis.Query("Group");
+      const group = await query.get(groupID, {useMasterKey: true});
+      logger.info(`[processGroup] ${group}`);
+      if (group) {
+        logger.info(`processGroup ${group.id}:${group.get("name")}`);
+        const stat = await processGroup(group);
+        result = stat.status
+        info = stat.result
+      } else {
+        logger.error(`Failed to locate Group ${groupID}`);
+        throw "Failed to locate Group"
+      }
+    }
+    catch (err) {
+      logger.error(`[processGroup] ${err}`);
+      error = err;
+    }
+    finally {
+      return {result: result, info: info, error: error}
+    }
+  })
 
 async function getGroupSendgridKey(group) {
     return await getAPIKey("SENDGRID_API_KEY");
@@ -136,19 +168,31 @@ async function cleanupGroupAlertQueues(group, result) {
     try {
         const uChannel = group.get("UserChannel");
         for (let i=0; i < aqs.length; i++) {
+            let clean = false;
             const aq = aqs[i];
-            const sub = aq.get("Subscription");
-            await sub.fetch({useMasterKey: true});
-            const content = aq.get("content");
-            const clean = await saveAlertHistory(sub, content, result, uChannel, group, aq.id);
-            if (clean) {
-                await aq.destroy({useMasterKey: true});
+            try {
+                const sub = aq.get("Subscription");
+                if (sub) {
+                    await sub.fetch({useMasterKey: true});
+                } else {
+                    await aq.destroy({useMasterKey: true});
+                    throw `Missing Sub for ${aq.id} - Destroyed`
+                }
+                const content = aq.get("content");
+                clean = await saveAlertHistory(sub, content, result, uChannel, group, aq.id);
+            } catch (err) {
+                logger.error(`[cleanupGAQ] Error ${err}`);
+            }
+            finally {
+                if (clean) {
+                    await aq.destroy({useMasterKey: true});
+                }
             }
         }
     }
     catch (err) {
-        logger.error(err)
-        return false
+        logger.error("[cleanupGroupAlertQueues] " + err);
+        return false;
     }
     return true;
 }
@@ -174,6 +218,7 @@ async function getGroupTemplateData(group) {
             title: messageData.title,
             image: messageData.imageUrl,
             text: content.rich || content.plain,
+            alertDate: alert.get("updatedAt"),
             "c2a_link": link,
             "c2a_button": "Open"
         })
@@ -207,6 +252,7 @@ async function sendGroup(group) {
     const SENDGRID_API_KEY = await getGroupSendgridKey();
     const templateData = await getGroupTemplateData(group);
     const to = await getGroupToData(group);
+    const subject = `[Notifi] ${group.get("name")}`;
     const data = {
       personalizations: [
         {
@@ -215,7 +261,7 @@ async function sendGroup(group) {
         },
       ],
       from: { email: "no-reply@cryptonotifi.xyz", name: "Crypto Notifi" },
-      subject: "CryptoNotifi Alert",
+      subject: subject,
       template_id: getGroupTemplateID()
     };
 

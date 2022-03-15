@@ -103,7 +103,7 @@ function checkAlertSubscriptionFrequency(subscription, content, messageData) {
 }
 
 async function saveAlertHistory(subscription, content, result, uChannel=null, group=null, alertID=null) {
-  logger.info("Make AlertHistory");
+  //logger.info(`[saveAlertHistory] ${subscription}`);
   const aHist = Moralis.Object.extend("AlertHistory");
   const ah = new aHist();
   let u = null;
@@ -116,7 +116,9 @@ async function saveAlertHistory(subscription, content, result, uChannel=null, gr
     u = group.get("User");
   }
   try {
-    ah.set("User", u);
+    if (u) {
+      ah.set("User", u);
+    }
     ah.set("Subscription", subscription);
     ah.set("content", content);
     ah.set("result", result);
@@ -132,7 +134,7 @@ async function saveAlertHistory(subscription, content, result, uChannel=null, gr
     }
     await ah.save(null, { useMasterKey: true });
   } catch (err) {
-    logger.error(err)
+    logger.error("[saveAlertHistory] - " + err);
     return false;
   }
   return true;

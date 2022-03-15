@@ -5,21 +5,6 @@ Moralis.Cloud.beforeSave(
   async (request) => {
     await checkUserStakingLevels(request);
   },
- /* {
-    fields: {
-      name: {
-        required: true,
-        error: "You must provide a Name",
-      },
-      status: {
-        required: true,
-        options: (status) => {
-          return status == "active" || status == "paused";
-        },
-        error: "Invalid Subscription status value",
-      },
-    },
-  }*/
 );
 
 async function checkUserStakingLevels(request) {
@@ -37,26 +22,23 @@ async function checkUserStakingLevels(request) {
 }
 
 Moralis.Cloud.afterSave("Subscription", async (request) => {
-  const logger = Moralis.Cloud.getLogger();
   const { object: sub, context } = request;
   updateUserChannelSubscriptions(sub, false);
-  if (context && context.insert) {
-    updateSubscriptionInsert(sub);
-    const type = sub.get("subscriptionType");
-    if (type == "Smart Contracts") {
-      processSmartContractSubscription(sub);
-    } else if (type == "Smart Wallet Alerts") {
-      processSmartWalletSubscription(sub);
-    }
+  const type = sub.get("subscriptionType");
+  if (type == "Smart Contracts") {
+    processSmartContractSubscription(sub);
+  } else if (type == "Smart Wallet Alerts") {
+    processSmartWalletSubscription(sub);
   }
+
 });
 
 Moralis.Cloud.afterDelete("Subscription", async (request) => {
   const logger = Moralis.Cloud.getLogger();
   const { object: sub, context } = request;
   logger.info(`[subscription.afterDelete()] `);
-  updateSubscriptionDelete(sub);
   updateUserChannelSubscriptions(sub, true);
+  cleanupAlertQueues(sub);
   const type = sub.get("subscriptionType");
   if (type == "Smart Contracts") {
     processSmartContractSubscriptionDelete(sub);
@@ -65,73 +47,67 @@ Moralis.Cloud.afterDelete("Subscription", async (request) => {
   }
 });
 
+async function cleanupAlertQueues(sub) {
+  try {
+    const query = new Moralis.Query("AlertQueue");
+    query.equalTo("Subscription", sub);
+    const aqs = await query.find({useMasterKey: true});
+    aqs.forEach( async (aq) => {
+        aq.destroy({useMasterKey: true});
+    })
+  } catch (err) {
+    logger.err("[cleanupAlertQueue] " + err)
+  }
+}
+
 // Add me as a subscription on all of my current UserChannels for 2 way M:N relation support
 async function updateUserChannelSubscriptions(sub, remove) {
-  const rel = sub.relation("UserChannel")
-  const q = rel.query();
-  const chans = await q.find({useMasterKey: true})
-  for (let i=0; i < chans.length; i++) {
-    const ucrel = chans[i].relation("subscriptions");
-    if (remove == true) {
-      ucrel.remove(sub);
-    } else {
-      ucrel.add(sub);
+  try {
+    const rel = sub.relation("UserChannel")
+    const q = rel.query();
+    const chans = await q.find({useMasterKey: true})
+    for (let i=0; i < chans.length; i++) {
+      const ucrel = chans[i].relation("subscriptions");
+      if (remove == true) {
+        ucrel.remove(sub);
+      } else {
+        ucrel.add(sub);
+      }
+      chans[i].save(null, {useMasterKey: true})
     }
-    ucrel.save(null, {useMasterKey: true})
+  } catch (err) {
+    logger.error("[updateUserChannelSubscriptions] - " + err)
   }
 }
 
-async function updateSubscriptionInsert(sub) {
-  const logger = Moralis.Cloud.getLogger();
-  const con = sub.get("contract");
-  logger.info("CON=" + con);
-  if (con) {
-    con.increment("SubscriptionCount", 1, { useMasterKey: true });
-    con.save();
+/* eslint-disable no-undef */
+Moralis.Cloud.define("processSmartContract", async (request) => {
+  logger.info("[SmartContract] Starting SmartContract Processing");
+  try {
+    const subID = request.params.subscriptionID;
+    logger.info("[SmartContract] A " + subID);
+    const query = new Moralis.Query("Subscription");
+    logger.info("[SmartContract] B");
+    const sub = await query.get(subID, {useMasterKey: true});
+    logger.info(`[SmartContract] ${sub}`);
+    if (sub) {
+      logger.info(`SmartContract SUB ${sub.id}:${sub.get("name")}`);
+      return await processSmartContractSubscription(sub);
+    } else {
+      logger.error(`Failed to locate Subscription ${subID}`);
+      throw "Failed to locate Subscription"
+    }
   }
-
-  const conAct = sub.get("contractActivity");
-  logger.info("CONACT=" + conAct);
-  if (conAct) {
-    conAct.increment("SubscriptionCount", 1, { useMasterKey: true });
-    conAct.save();
+  catch (err) {
+    logger.error(`[SmartContract] ${err}`);
+    throw err;
   }
+})
 
-  const rel = sub.relation("UserChannel");
-  const ucQ = rel.query();
-  const ucs = await ucQ.find({ useMasterKey: true });
-  logger.info("UCS-" + ucs);
-  for (let i = 0; i < ucs.length; i++) {
-    ucs[i].increment("SubscriptionCount", 1, { useMasterKey: true });
-    ucs[i].save();
-  }
-}
 
-async function updateSubscriptionDelete(sub) {
-  const con = sub.get("contract");
-  if (con) {
-    con.decrement("SubscriptionCount", 1, { useMasterKey: true });
-    con.save();
-  }
-
-  const conAct = sub.get("contractActivity");
-  if (conAct) {
-    conAct.decrement("SubscriptionCount", 1, { useMasterKey: true });
-    conAct.save();
-  }
-
-  const rel = sub.relation("UserChannel");
-  const ucQ = rel.query();
-  const ucs = await ucQ.find({ useMasterKey: true });
-  for (let i = 0; i < ucs.length; i++) {
-    ucs[i].decrement("SubscriptionCount", 1, { useMasterKey: true });
-  }
-}
-
-function processSmartContractSubscription(sub) {
-  const logger = Moralis.Cloud.getLogger();
-  logger.info(`[processSmartContractSub] `);
-  setupSmartContractWatch(sub);
+async function processSmartContractSubscription(sub) {
+  logger.info(`[processSmartContractSub] ${sub.id}`);
+  return await setupSmartContractWatch(sub);
 }
 
 async function setupSmartContractWatch(sub) {
@@ -160,25 +136,32 @@ async function setupSmartContractWatch(sub) {
         abi: abi,
         sync_historical: false,
       };
-      logger.info("[setupSmartContractWatch] Options: " + options);
+      /* logger.info("[setupSmartContractWatch] Options: " + options);
       Object.entries(options).forEach(([key, value]) => {
         logger.info(`${key}=${value}`);
-      });
+      });*/
       const wceResult = await Moralis.Cloud.run("watchContractEvent", options, {
         useMasterKey: true,
       });
       logger.info(
         `[setupSmartContractWatch] watchContractEvent--${wceResult.success}:${wceResult.error}`
       );
-      Moralis.Cloud.beforeConsume(tableName, (event) => {
-        return event && event.confirmed;
-      });
+      if (wceResult.success) {
+        Moralis.Cloud.beforeConsume(tableName, (event) => {
+          return event && event.confirmed;
+        });
+        return {success: true, result: "New Watch Started on " + tableName}
+      } else {
+        logger.error("Watch Setup Failed - " + wceResult.error);
+        return {success: false, result: wceResult.error}
+      }
     } catch (err) {
       logger.error("Watch Setup error - " + err.message);
-      return;
+      return {success: false, result: err.message}
     }
   } else {
     logger.info("[setupSmartContractWatch] Already watching:" + tableName);
+    return {success: true, result: "Already Watching"}
   }
 }
 
@@ -207,41 +190,52 @@ function getTableName(prot, contract, activity) {
   logger.info(`[GetTableName] CN=${contract.attributes}`);
   logger.info(`[GetTableName] PN=${prot.attributes}`);
 
-  const pname = prot.get("name").replace(/[-+()_/.\s]/g, "");
-  const cname = contract.get("name").replace(/[-+()_/.\s]/g, "");
-  const act = activity.get("name").replace(/[-+()_/.\s]/g, "");
+  const pname = prot.get("name").replace(/[-+()_/.\s0-9]/g, "");
+  const cname = contract.get("name").replace(/[-+()_/.\s0-9]/g, "");
+  const act = activity.get("name").replace(/[-+()_/.\s0-9]/g, "");
   return `${pname}${cname}${act}`;
 }
 
-function processSmartWalletSubscription(sub) {
-  const logger = Moralis.Cloud.getLogger();
-  logger.info(`[processSmartWalletSub] `);
+async function processSmartContractSubscriptionDelete(sub) {
+  logger.info(`[processSmartContractSubDelete] `);
+  let error = ""
+  let result = false;
+  try {
+    let contract = sub.get("contract");
+    contract = await contract.fetch({ useMasterKey: true });
+    const subQ = new Moralis.Query("Subscription")
+    subQ.equalTo("contract", contract)
+    const subCount = await subQ.count({useMasterKey: true})
+    if (subCount != 0) {
+      logger.info(`[processSmartContractSubDelete] Still has subs`);
+      return;
+    }
+    let activity = sub.get("contractActivity");
+    activity = await activity.fetch({ useMasterKey: true });
+    let prot = sub.get("Protocol");
+    prot = await prot.fetch({ useMasterKey: true });
+    const tableName = getTableName(prot, contract, activity);
+    logger.info(`[processSmartContractSubDelete] TableName= ${tableName}`);
+    let unwatchOptions = { tableName: tableName };
+    wcr = await Moralis.Cloud.run("unwatchContractEvent", unwatchOptions, {
+      useMasterKey: true,
+    });
+    result = wcr.result;
+  } catch (err) {
+    result = false;
+    error = err;
+    logger.error(`[processSmartContractSubDelete] - ${err}`);
+  }
+  finally {
+    logger.info(`[processSmartContractSubDelete] Res= ${result}`);
+    return {result: result, error: error};
+  }
 }
 
-async function processSmartContractSubscriptionDelete(sub) {
-  const logger = Moralis.Cloud.getLogger();
-  logger.info(`[processSmartContractSubDelete] `);
-  let contract = sub.get("contract");
-  contract = await contract.fetch({ useMasterKey: true });
-  const subCount = contract.get("SubscriptionCount");
-  if (subCount != 0) {
-    logger.info(`[processSmartContractSubDelete] Still has subs`);
-    return;
-  }
-  let activity = sub.get("contractActivity");
-  activity = await activity.fetch({ useMasterKey: true });
-  let prot = sub.get("Protocol");
-  prot = await prot.fetch({ useMasterKey: true });
-  const tableName = getTableName(prot, contract, activity);
-  logger.info(`[processSmartContractSubDelete] TableName= ${tableName}`);
-  let unwatchOptions = { tableName: tableName };
-  const res = await Moralis.Cloud.run("unwatchContractEvent", unwatchOptions, {
-    useMasterKey: true,
-  });
-  logger.info(`[processSmartContractSubDelete] Res= ${res}`);
+function processSmartWalletSubscription(sub) {
+  // logger.info(`[processSmartWalletSub] `);
 }
 
 function processSmartWalletSubscriptionDelete(sub) {
-  const logger = Moralis.Cloud.getLogger();
-  logger.info(`[processSmartWalletSubDelete] `);
+  //logger.info(`[processSmartWalletSubDelete] `);
 }
