@@ -130,16 +130,15 @@ async function setupSmartContractWatch(sub) {
       const chainID = getChainID(activity);
       const options = {
         tableName: tableName,
-        chainID: chainID,
+        chainId: chainID,
         address: contract.get("address"),
         topic: activity.get("topic"),
         abi: abi,
         sync_historical: false,
       };
-      /* logger.info("[setupSmartContractWatch] Options: " + options);
-      Object.entries(options).forEach(([key, value]) => {
-        logger.info(`${key}=${value}`);
-      });*/
+      
+      const opt = JSON.stringify(options)
+      logger.info("[setupSmartContractWatch] Options: " + opt);
       const wceResult = await Moralis.Cloud.run("watchContractEvent", options, {
         useMasterKey: true,
       });
@@ -166,7 +165,7 @@ async function setupSmartContractWatch(sub) {
 }
 
 async function checkForWatch(tableName) {
-  const q = new Moralis.Query("EventSync");
+  const q = new Moralis.Query("_EventSyncStatus");
   q.equalTo("tableName", tableName);
   const count = await q.count({ useMasterKey: true });
   return count !== 0;

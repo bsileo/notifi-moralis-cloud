@@ -10,10 +10,16 @@ Moralis.Cloud.afterSave("Alert", async (request) => {
   };
   const prot = alert.get("protocol");
   let protocolName = ""
+  let imageUrl = ""
   if (prot) {
     query.equalTo("Protocol", prot);
     await prot.fetch({useMasterKey: true});
     protocolName = prot.get("name");
+    imageUrl = prot.get("iconURL");
+  }
+  const alertImageUrl = alert.get("imageUrl")
+  if (alertImageUrl) {
+    imageUrl = alertImageUrl;
   }
   query.equalTo("subscriptionType", "Protocol Alerts");
   query.equalTo("GeneralSubType", subType);
@@ -24,6 +30,7 @@ Moralis.Cloud.afterSave("Alert", async (request) => {
     const messageData = {
       title: `${protocolName} Protocol Update`,
       subscriptionType: "Protocol Alert",
+      imageUrl: imageUrl,
       protocolName: protocolName,
       category: subType.get("name"),
       url: alert.get("url"),

@@ -33,6 +33,32 @@ async function getLogger() {
   };
 }
 
+Moralis.Cloud.define("reportError", async (request) => {
+  try {
+    const message = request.params.message;
+    const level = request.params.level;
+    const functionName = request.params.functionName;
+    const userName = "";
+    const user = request.user
+    return reportError(message, functionName, user, userName, level);
+  }
+  catch (err) {
+    logger.error("[cloudFunction.reportError] - " + err)
+  }
+  return false;
+})
+
+async function reportError(message, functionName="", user=null, userName="cloud", level="error") {
+  const errorLogs = Moralis.Object.extend("ErrorLogs");
+  const errorLog = new errorLogs();
+  errorLog.set("message", message);
+  errorLog.set("User", user);
+  errorLog.set("userName", userName);
+  errorLog.set("level", level);
+  await errorLog.save({ useMasterKey: true });
+  return true;
+}
+
 function roundToTwo(num ) {
   const val = num * 100;
   const res = Math.round(val);

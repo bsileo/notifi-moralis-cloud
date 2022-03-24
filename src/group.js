@@ -5,7 +5,9 @@ Moralis.Cloud.beforeSave("Group", async (request) => {
         updateNextSend(group);
     }
     catch (err) {
-        logger.error("[Group.beforeSave] - " + err)
+        const msg = `[Group.beforeSave] - ${err}`;
+        logger.error(msg);
+        reportError(msg,"Group.beforeSave");
     }
 });
 
@@ -19,7 +21,9 @@ Moralis.Cloud.afterDelete("Group", async (request) => {
         await aSub.save(null, {useMasterKey: true});
     })
     } catch (err) {
-        logger.error("[Group.afterDelete] - " + err)
+        const msg = `[Group.afterDelete] - ${err}`;
+        logger.error(msg);
+        reportError(msg,"Group.afterdelete");
     }
   });
 
@@ -145,7 +149,8 @@ Moralis.Cloud.define("processGroup", async (request) => {
       }
     }
     catch (err) {
-      logger.error(`[processGroup] ${err}`);
+      const msg = `[processGroup] ${err}`;
+      logger.error(msg);
       error = err;
     }
     finally {
@@ -181,7 +186,9 @@ async function cleanupGroupAlertQueues(group, result) {
                 const content = aq.get("content");
                 clean = await saveAlertHistory(sub, content, result, uChannel, group, aq.id);
             } catch (err) {
-                logger.error(`[cleanupGAQ] Error ${err}`);
+                const msg = `[cleanupGAQ] Error ${err}`
+                logger.error(msg);
+                reportError(msg,"cleanupGroupAlertQueues")
             }
             finally {
                 if (clean) {
@@ -191,7 +198,9 @@ async function cleanupGroupAlertQueues(group, result) {
         }
     }
     catch (err) {
-        logger.error("[cleanupGroupAlertQueues] " + err);
+        const msg = `[cleanupGroupAlertQueues] ${err}`;
+        logger.error(msg);
+        reportError(msg,"Group.cleanupGroupAlertQueues");
         return false;
     }
     return true;
@@ -240,7 +249,10 @@ async function getGroupToData(group) {
         await channel.fetch({useMasterKey: true});
         to.push( { email: channel.get("providerData").email })
     } catch (err) {
-        logger.error("[groupToData] Failed - " + err)
+        const msg = `[groupToData] Failed - ${err}`;
+        logger.error(msg);
+        reportError(msg,"Group.groupToData");
+        return false;
     }
     logger.info(`[groupToData] Return`);
     return to;
@@ -286,6 +298,7 @@ async function sendGroup(group) {
         "::" +
         httpResp.text;
       logger.error(msg);
+      reportError(msg,"Group.sendGroup");
       const result = { status: false, error: msg, result: httpResp.text };
       return result;
     }
